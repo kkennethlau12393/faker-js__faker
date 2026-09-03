@@ -1,0 +1,49 @@
+# The baseline is the map, timed on a hosted runner: the stages before the first verdict on the road
+# the fold replaced (three runs of the suite) and on the folded road (one), one job per arm, three
+# repetitions each. The engine is the packed closure committed under .abloh-timing/engine, built from
+# the abloh branch named in ABLOH_BRANCH at ABLOH_SHA; nothing is fetched from the abloh repository.
+name: aster fold timing
+on:
+  push:
+    branches: [aster-fold-timing]
+  workflow_dispatch:
+env:
+  ABLOH_BRANCH: fm/abloh-map-in-baseline
+  ABLOH_SHA: 6790502291ce17f470ac29e2ba19eca4f374d892
+jobs:
+  stages:
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [folded, separate]
+    name: stages (${{ matrix.arm }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: install the repository the way its own CI does
+        env:
+          CI: "true"
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+      - name: install the packed engine closure
+        # npm 11.5.x crashes in arborist's peer walk on a tree holding vitest's exact-version optional
+        # peers (@abloh/measure depends on vitest); 11.6 does not. The same pin the release gate carries.
+        run: |
+          mkdir -p .abloh-timing/runtime
+          npx -y npm@11.6.1 install --prefix .abloh-timing/runtime --no-save --no-audit --no-fund ./.abloh-timing/engine/*.tgz
+          ls .abloh-timing/runtime/node_modules/@abloh
+          sha256sum .abloh-timing/engine/*.tgz
+      - name: the ${{ matrix.arm }} road, three times
+        run: node .abloh-timing/fold-timing.mjs ${{ matrix.arm }} 3 "$PWD/.abloh-timing/runtime/node_modules"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aster-fold-timing-${{ matrix.arm }}
+          path: .abloh-timing/out/

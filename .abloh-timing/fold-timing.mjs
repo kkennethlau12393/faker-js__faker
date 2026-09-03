@@ -61,6 +61,7 @@ const context = {
   runnerOs: process.env.RUNNER_OS ?? null,
   ablohBranch: process.env.ABLOH_BRANCH ?? null,
   ablohSha: process.env.ABLOH_SHA ?? null,
+  quarantined: null,
 };
 
 /** The suite as the baseline runs it: the repository's own command plus the reporter flags. */
@@ -91,6 +92,8 @@ rmSync(probeScratch, { recursive: true, force: true });
 const population = [...probe.map.greenTestFiles, ...probe.map.redTestFiles].sort();
 console.log(`population: ${population.length} test file(s), ${probe.map.greenTestFiles.length} green / ${probe.map.redTestFiles.length} red, probe backend ${probe.backend}${probe.oneRunFallback ? `, FELL BACK: ${probe.oneRunFallback}` : ""}, probe wall ${probe.wallMs} ms`);
 if (probe.oneRunFallback) throw new Error(`the one-run hook refused on this runner: ${probe.oneRunFallback}`);
+context.quarantined = [...probe.map.redTestFiles];
+console.log(`quarantined on both roads (red at the probe): ${context.quarantined.join(", ") || "none"}`);
 
 const rows = [];
 let lastLines = null;
@@ -103,6 +106,9 @@ for (let rep = 1; rep <= reps; rep += 1) {
       let coverageMs = null;
       let coverageNote = null;
       let classified = null;
+      /* TIMED AROUND THE CALL, so a run the provider road refuses after executing the whole suite
+         still costs what it cost: the first hosted run lost this number to a refusal. */
+      const coverageStarted = Date.now();
       try {
         const collected = await measure.runDiffCoverage({
           runner: "vitest",
@@ -114,13 +120,19 @@ for (let rep = 1; rep <= reps; rep += 1) {
           testCommand: "npx --no-install vitest run",
           packageManagerMajor: 11,
           timeoutMs: 1_800_000,
+          /* THE SAME POPULATION THE MAP MEASURES. faker's suite is red on this runner (five files),
+             and the product quarantines them: the coverage run then excludes those files, as the map
+             excludes them whole, so both roads classify off the same green tests. */
+          baselineFailuresQuarantined: probe.map.redTestFiles.length > 0,
+          quarantinedTestFiles: probe.map.redTestFiles,
         });
         coverageMs = collected.wallMs;
         classified = core.classifyDiffCoverage(SCOPE, collected.coverage);
         console.log(`rep ${rep}: coverage run ${coverageMs} ms (${collected.provider.provider} ${collected.provider.providerVersion}), ${JSON.stringify(classified.counts)}`);
       } catch (error) {
+        coverageMs = Date.now() - coverageStarted;
         coverageNote = String(error && error.message ? error.message : error);
-        console.log(`rep ${rep}: coverage run FAILED: ${coverageNote}`);
+        console.log(`rep ${rep}: coverage run refused after ${coverageMs} ms: ${coverageNote}`);
       }
       const mapStarted = Date.now();
       const built = await aster.buildLineMap({ plan, testFiles: population, scratchDir: join(scratch, "map"), perFileTimeoutMs: 1_800_000, suiteTimeoutMs: 1_800_000, onNote: (line) => console.log(`  [map rep ${rep}] ${line}`) });
@@ -213,7 +225,7 @@ const summary = [
   "",
   "| rep | plain suite | baseline | coverage | map | read | classify | stages total | suite runs | census | counts |",
   "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
-  ...rows.map((row) => `| ${row.rep} | ${seconds(row.plainSuiteMs)} | ${seconds(row.baselineMs)} | ${seconds(row.coverageMs)}${row.coverageNote ? " (FAILED)" : ""} | ${seconds(row.mapMs)} | ${seconds(row.readMs)} | ${seconds(row.classifyMs)} | **${seconds(row.totalMs)}** | ${row.suiteRuns} | ${row.censusComplete} | ${row.counts ? JSON.stringify(row.counts) : "n/a"} |`),
+  ...rows.map((row) => `| ${row.rep} | ${seconds(row.plainSuiteMs)} | ${seconds(row.baselineMs)} | ${seconds(row.coverageMs)}${row.coverageNote ? " (refused)" : ""} | ${seconds(row.mapMs)} | ${seconds(row.readMs)} | ${seconds(row.classifyMs)} | **${seconds(row.totalMs)}** | ${row.suiteRuns} | ${row.censusComplete} | ${row.counts ? JSON.stringify(row.counts) : "n/a"} |`),
   "",
   `**median plain suite ${seconds(plainMedian)}**, **median stages total ${seconds(totalMedian)}**, ratio total / suite ${(totalMedian / plainMedian).toFixed(2)}x`,
   "",

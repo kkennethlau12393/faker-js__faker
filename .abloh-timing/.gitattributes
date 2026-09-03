@@ -1,0 +1,3 @@
+# Abloh owns this directory. The repository root declares `* text eol=lf`, which would normalise the
+# packed tarballs below and hand npm a Z_DATA_ERROR on the runner; everything here is bytes.
+* binary

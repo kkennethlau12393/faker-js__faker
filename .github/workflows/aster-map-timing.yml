@@ -1,0 +1,46 @@
+# Aster's two map backends, timed on a hosted runner: one job per backend, three repetitions each.
+# The engine is the packed closure committed under .abloh-timing/engine, built from the abloh scratch
+# branch named in ABLOH_SCRATCH_REF at ABLOH_SCRATCH_SHA; nothing is fetched from the abloh repository.
+name: aster map timing
+on:
+  push:
+    branches: [aster-map-timing]
+  workflow_dispatch:
+env:
+  ABLOH_SCRATCH_REF: scratch/abloh-map-one-run-vitest-jest
+  ABLOH_SCRATCH_SHA: e91c38ce321d5632b9c735b9c4e942d8cdb86ced
+jobs:
+  map:
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [one-run, per-file]
+    name: map (${{ matrix.arm }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: install the repository the way its own CI does
+        env:
+          CI: "true"
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+      - name: install the packed engine closure
+        run: |
+          mkdir -p .abloh-timing/runtime
+          npm install --prefix .abloh-timing/runtime --no-save --no-audit --no-fund ./.abloh-timing/engine/*.tgz
+          ls .abloh-timing/runtime/node_modules/@abloh
+          sha256sum .abloh-timing/engine/*.tgz
+      - name: plain suite, then the ${{ matrix.arm }} map, three times
+        run: node .abloh-timing/map-timing.mjs ${{ matrix.arm }} 3 "$PWD/.abloh-timing/runtime/node_modules/@abloh/engine-aster/dist/index.js"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aster-map-timing-${{ matrix.arm }}
+          path: .abloh-timing/out/

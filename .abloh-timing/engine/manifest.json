@@ -1,0 +1,11 @@
+{
+  "ablohRepository": "Vero-Technology/abloh",
+  "ablohScratchRef": "scratch/abloh-map-one-run-vitest-jest",
+  "ablohScratchSha": "e91c38ce321d5632b9c735b9c4e942d8cdb86ced",
+  "packedFrom": "pnpm pack in each package directory of that commit, 2026-09-04",
+  "tarballs": {
+    "abloh-core-0.1.3.tgz": "f1c8bd357b8369d4a0a6036e01d195fdc73c1abbb5fc729e51fe17b13c64011f",
+    "abloh-engine-aster-0.1.0.tgz": "be0b024e82c3f107e665eeae1f946a9556cc8e16063c250ac14bf1aa6427f4dd",
+    "abloh-engine-v2-0.1.0.tgz": "4fcc69e47aaa81a7ff61e6fe526d8b449b263586b9aa012aed52b0b417b61129"
+  }
+}

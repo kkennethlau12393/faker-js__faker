@@ -1,0 +1,26 @@
+# abloh.yml - read from the PR merge base, so changes are reviewed like code.
+# Keys: https://abloh.dev/docs#config
+
+# % of mechanical breaks in changed lines your tests must catch.
+threshold: 70
+
+# true: below threshold fails the check. Blocks merges only if also marked
+# required in branch protection.
+enforce: true
+
+# The job in your own CI that Abloh's step rides. Abloh reads your workflows to
+# pick it and proves the choice by running there; change it to move the step.
+# That job runs once per matrix leg, and matrixLeg is the one it rides. Abloh's
+# step carries an if: that is true on this leg only, so it measures once.
+setup:
+  job: .github/workflows/ci.yml::unit-test
+  matrixLeg:
+    node_version: 22
+    os: ubuntu-latest
+
+# Rebuild recipe for the proof container. Comments name the source file.
+environment:
+  runtimeImage: node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 # reviewed Node 22 image (your CI's own Node, node ^20.19.0 || ^22.13.0 || ^23.5.0 || >=24.0.0 in package.json, and .nvmrc names lts/jod, which abloh does not resolve. Write a version there or set environment.runtimeImage)
+  installDirectory: .
+  setup: .abloh/setup.sh # written by init and yours to edit. Every cold run executes it step by step
+  testCommand: corepack pnpm test # scripts.test in package.json

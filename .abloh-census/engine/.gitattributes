@@ -1,0 +1,7 @@
+# Abloh's own bundle. These are compressed archives carried verbatim to a runner.
+#
+# A repository's root .gitattributes applies here too, and a rule such as `* text` or
+# `* text=auto` rewrites line endings when a file is committed - which destroys the bytes of a
+# .tgz and makes npm fail with Z_DATA_ERROR. This file takes precedence for the paths beneath it,
+# so the repository's own rule stays exactly as its maintainer wrote it.
+* binary
